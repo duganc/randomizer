@@ -5,6 +5,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Debug exposing (log)
+import Maybe.Extra exposing (filter, join)
 import Random
 
 -- MAIN
@@ -63,9 +64,7 @@ maybeParsePercentage : String -> Maybe Float
 maybeParsePercentage = String.toInt >> Maybe.map (\n -> (toFloat n) / 100.0)
 
 validatePercentage : Maybe Float -> Maybe Float
-validatePercentage i = case i of
- Nothing -> Nothing
- Just f -> if (f >= 0.0 && f <= 1.0) then Just f else Nothing
+validatePercentage = Maybe.Extra.filter (\f -> (f >= 0.0 && f <= 1.0))
 
 getSubmitButtonState : String -> SubmitButtonState
 getSubmitButtonState s =
