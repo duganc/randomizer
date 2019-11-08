@@ -3,7 +3,7 @@ module Randomizer exposing (..)
 import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, onInput)
 import Debug exposing (log)
 import Random
 
@@ -15,27 +15,61 @@ main =
 -- MODEL
 
 type alias Model =
- { result : RandomResult }
+ { result : RandomResult
+ , customText : String
+ , submitButton : SubmitButtonState
+ }
+
+type SubmitButtonState = 
+   Allowed Float
+ | Disallowed
 
 init : () -> ( Model, Cmd Msg )
-init _ = (Model None, Cmd.none )
+init _ = (Model None "" Disallowed, Cmd.none )
 
 -- UPDATE
 
-type Msg = RandomNumber Float | Submit RandomResult
+type Msg = RandomNumber Float | Submit RandomResult | CustomTextChange String | CustomButtonSubmit
 type RandomResult = None | Success | Failure
+
+generateRandom : Float -> Cmd Msg
+generateRandom f = Random.generate Submit (Random.weighted (f, Success) [ (1.0 - f, Failure) ])
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
  case msg of
   RandomNumber f ->
    ( model
-   , Random.generate Submit (Random.weighted (f, Success) [ (1.0 - f, Failure) ])
+   , generateRandom f
    )
   Submit r ->
-   ( Model r
+   ( { model | result = r }
    , Cmd.none
    )
+  CustomTextChange s ->
+   ( { model | submitButton = getSubmitButtonState s, customText = s }
+   , Cmd.none
+   )
+  CustomButtonSubmit ->
+   ( model
+   , case model.submitButton of
+    Allowed f -> generateRandom f
+    Disallowed -> Cmd.none
+   )
+
+maybeParsePercentage : String -> Maybe Float
+maybeParsePercentage = String.toInt >> Maybe.map (\n -> (toFloat n) / 100.0)
+
+validatePercentage : Maybe Float -> Maybe Float
+validatePercentage i = case i of
+ Nothing -> Nothing
+ Just f -> if (f >= 0.0 && f <= 1.0) then Just f else Nothing
+
+getSubmitButtonState : String -> SubmitButtonState
+getSubmitButtonState s =
+ case s |> maybeParsePercentage |> validatePercentage of
+  Just f -> Allowed f
+  Nothing -> Disallowed
 
 -- SUBSCRIPTIONS
 
@@ -63,6 +97,15 @@ generateButton f =
  else
   button [ onClick (RandomNumber f) ] [ text (toPercentageString f) ]
 
+getSubmitMessage : SubmitButtonState -> String
+getSubmitMessage s =
+ case s of
+  Allowed _ -> "Submit"
+  Disallowed -> "Invalid Entry"
+
+getSubmitButton : SubmitButtonState -> Html Msg
+getSubmitButton s = button [ onClick CustomButtonSubmit ] [ text (getSubmitMessage s) ]
+
 view : Model -> Html Msg
 view model = 
  div []
@@ -74,4 +117,7 @@ view model =
   , generateButton 0.25
   , generateButton 0.1
   , generateButton 0.01
+  , div[] []
+  , input [ placeholder "Custom %", value model.customText, onInput CustomTextChange] []
+  , getSubmitButton model.submitButton
   ]
